@@ -1,0 +1,43 @@
+{
+    "name": "bizfunnel/licensing-client-php-sdk",
+    "description": "Bizfunnel Licensing Client PHP SDK - Works with both core PHP and Laravel",
+    "type": "library",
+    "keywords": [
+        "bizfunnel",
+        "license",
+        "licensing",
+        "validation",
+        "sdk",
+        "php",
+        "laravel"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Your Name",
+            "email": "your.email@example.com"
+        }
+    ],
+    "require": {
+        "php": "^8.0",
+        "ext-curl": "*",
+        "ext-json": "*"
+    },
+    "suggest": {
+        "illuminate/support": "For Laravel HTTP client support (optional)"
+    },
+    "autoload": {
+        "files": [
+            "LicenseClient.php"
+        ]
+    },
+    "autoload-dev": {
+        "files": [
+            "example.php",
+            "example-laravel.php"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
+
