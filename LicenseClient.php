@@ -46,11 +46,15 @@ class LicenseClient
     /**
      * Setup or validate a license
      * 
+     * This method intelligently checks local token first. If valid, returns immediately.
+     * If invalid/expired and auto-refresh is enabled, calls server to get new token.
+     * 
      * @param string $licenseKey The license key
      * @param string $domain The domain name
      * @param string $ip The IP address
      * @param string $directory The installation directory
      * @param int $checkInterval Check interval in days (7-90)
+     * @param bool $autoRefresh Whether to automatically refresh token if invalid (default: true)
      * @return array Response array with status, message, and data
      * @throws \Exception
      */
@@ -59,12 +63,50 @@ class LicenseClient
         string $domain,
         string $ip,
         string $directory,
-        int $checkInterval = 30
+        int $checkInterval = 30,
+        bool $autoRefresh = true
     ): array {
         if ($checkInterval < 7 || $checkInterval > 90) {
             throw new \Exception('Check interval must be between 7 and 90 days');
         }
 
+        // First, check if we have a valid local token
+        $localToken = $this->loadLocalToken();
+        if (!empty($localToken)) {
+            $validation = $this->validateLocalToken(
+                localToken: $localToken,
+                domain: $domain,
+                ip: $ip,
+                directory: $directory,
+                checkInterval: $checkInterval
+            );
+
+            // If token is valid, return success without calling server
+            if ($validation['valid']) {
+                return [
+                    'status' => 'success',
+                    'message' => 'License is valid (using cached token)',
+                    'data' => [
+                        'local_token' => $localToken,
+                        'cached' => true,
+                    ],
+                ];
+            }
+
+            // Token is invalid/expired
+            // If auto-refresh is disabled, return error
+            if (!$autoRefresh) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Local token is invalid or expired. Auto-refresh is disabled.',
+                    'validation_error' => $validation['message'],
+                ];
+            }
+
+            // Auto-refresh is enabled, continue to call server below
+        }
+
+        // No valid token found or auto-refresh enabled - call server to get/refresh token
         $url = $this->baseUrl . '/api/v1/licenses/setup-or-validate';
         
         $data = [
@@ -79,6 +121,7 @@ class LicenseClient
 
         if ($response['status'] === 'success' && isset($response['data']['local_token'])) {
             $this->saveLocalToken($response['data']['local_token']);
+            $response['data']['cached'] = false; // Indicate this is a fresh token from server
         }
 
         return $response;
@@ -192,6 +235,86 @@ class LicenseClient
             'valid' => true,
             'data' => $decodedData,
         ];
+    }
+
+    /**
+     * Validate local token and auto-refresh if invalid
+     * 
+     * @param string $licenseKey The license key (required for auto-refresh)
+     * @param string $domain Current domain
+     * @param string $ip Current IP address
+     * @param string $directory Current directory
+     * @param int $checkInterval Check interval in days
+     * @param bool $autoRefresh Whether to automatically refresh token if invalid
+     * @return array Validation result with status and message
+     */
+    public function validateLocalTokenWithAutoRefresh(
+        string $licenseKey,
+        string $domain,
+        string $ip,
+        string $directory,
+        int $checkInterval = 30,
+        bool $autoRefresh = true
+    ): array {
+        // First, validate the existing token
+        $validation = $this->validateLocalToken(
+            localToken: null,
+            domain: $domain,
+            ip: $ip,
+            directory: $directory,
+            checkInterval: $checkInterval
+        );
+
+        // If token is valid, return it
+        if ($validation['valid']) {
+            return $validation;
+        }
+
+        // If auto-refresh is enabled and token is invalid, try to get a new one
+        if ($autoRefresh) {
+            try {
+                $response = $this->setupOrValidateLicense(
+                    licenseKey: $licenseKey,
+                    domain: $domain,
+                    ip: $ip,
+                    directory: $directory,
+                    checkInterval: $checkInterval
+                );
+
+                if ($response['status'] === 'success') {
+                    return [
+                        'status' => 'success',
+                        'message' => 'Token was invalid, but successfully refreshed',
+                        'valid' => true,
+                        'refreshed' => true,
+                        'data' => $this->validateLocalToken(
+                            localToken: $response['data']['local_token'] ?? null,
+                            domain: $domain,
+                            ip: $ip,
+                            directory: $directory,
+                            checkInterval: $checkInterval
+                        )['data'] ?? null,
+                    ];
+                } else {
+                    return [
+                        'status' => 'error',
+                        'message' => 'Token validation failed and refresh failed: ' . ($response['message'] ?? 'Unknown error'),
+                        'valid' => false,
+                        'refreshed' => false,
+                    ];
+                }
+            } catch (\Exception $e) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Token validation failed and refresh exception: ' . $e->getMessage(),
+                    'valid' => false,
+                    'refreshed' => false,
+                ];
+            }
+        }
+
+        // If auto-refresh is disabled, return the validation result
+        return $validation;
     }
 
     /**

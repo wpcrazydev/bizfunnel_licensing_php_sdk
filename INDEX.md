@@ -41,14 +41,16 @@ This directory contains the complete Bizfunnel Licensing Client PHP SDK with all
 **Core PHP example** - Demonstrates usage in plain PHP projects.
 - Basic setup
 - License validation
-- Token management
+- Token management with auto-refresh
 - Error handling
+- All available methods
 
 ### `example-laravel.php`
 **Laravel integration example** - Shows how to integrate in Laravel.
 - Service class example
 - Controller usage
 - Configuration examples
+- Auto-refresh validation
 - Best practices
 
 ## Installation Tools
@@ -98,6 +100,7 @@ This directory contains the complete Bizfunnel Licensing Client PHP SDK with all
 - PHP 8.0+
 - cURL extension
 - JSON extension
+- Laravel 8.0+ (optional, for HTTP client - auto-detected)
 
 ### File Structure
 ```
@@ -112,6 +115,13 @@ sdk/
 ├── composer.json          # Composer config
 └── .gitignore            # Git ignore rules
 ```
+
+### Available Methods
+- `setupOrValidateLicense()` - Setup/validate with auto-refresh
+- `publicValidateLicense()` - Public validation by domain/IP
+- `validateLocalToken()` - Validate stored token locally
+- `validateLocalTokenWithAutoRefresh()` - Validate with auto-refresh
+- `getLocalToken()` - Get stored token
 
 ### Installation Priority
 1. Read `QUICKSTART.md` for fastest setup

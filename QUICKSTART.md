@@ -49,11 +49,15 @@ try {
         domain: 'example.com',
         ip: '192.168.1.1',
         directory: __DIR__,
-        checkInterval: 30  // Days between checks (7-90)
+        checkInterval: 30,  // Days between checks (7-90)
+        autoRefresh: true   // Auto-refresh if token invalid (default: true)
     );
 
     if ($response['status'] === 'success') {
         echo "License activated! Token saved.\n";
+        if ($response['data']['cached'] ?? false) {
+            echo "Using cached token (no server call needed)\n";
+        }
     }
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
@@ -62,19 +66,32 @@ try {
 
 ## Step 4: Validate License (Later)
 
+**Just use the same method!** `setupOrValidateLicense()` automatically:
+- Checks local token first (fast, no server call if valid)
+- Auto-refreshes from server if token is invalid/expired
+- Works for both initial setup and ongoing validation
+
 ```php
-// Validate stored token
-$result = $client->validateLocalToken(
+// Use the same method for validation - it handles everything automatically
+$response = $client->setupOrValidateLicense(
+    licenseKey: 'your-license-key',
     domain: 'example.com',
     ip: '192.168.1.1',
     directory: __DIR__,
     checkInterval: 30
 );
 
-if ($result['valid']) {
+if ($response['status'] === 'success') {
     echo "License is valid!\n";
+    
+    // Check if using cached token (no server call) or fresh from server
+    if ($response['data']['cached'] ?? false) {
+        echo "Using cached token (fast, no server call)\n";
+    } else {
+        echo "Token refreshed from server\n";
+    }
 } else {
-    echo "License expired or invalid. Re-validate with server.\n";
+    echo "License validation failed: " . $response['message'] . "\n";
 }
 ```
 
@@ -92,26 +109,31 @@ $client = new LicenseClient(
 
 // Setup license (first time)
 $response = $client->setupOrValidateLicense(
-    'key_abc123_123456_20240101120000',
-    $_SERVER['HTTP_HOST'],
-    $_SERVER['SERVER_ADDR'],
-    __DIR__,
-    30
+    licenseKey: 'key_abc123_123456_20240101120000',
+    domain: $_SERVER['HTTP_HOST'],
+    ip: $_SERVER['SERVER_ADDR'],
+    directory: __DIR__,
+    checkInterval: 30,
+    autoRefresh: true
 );
 
 if ($response['status'] === 'success') {
     echo "✓ License activated\n";
     
-    // Later, validate the stored token
-    $validation = $client->validateLocalToken(
+    // Later, just call the same method again - it will use cached token if valid
+    $validation = $client->setupOrValidateLicense(
+        licenseKey: 'key_abc123_123456_20240101120000',
         domain: $_SERVER['HTTP_HOST'],
         ip: $_SERVER['SERVER_ADDR'],
         directory: __DIR__,
         checkInterval: 30
     );
     
-    if ($validation['valid']) {
+    if ($validation['status'] === 'success') {
         echo "✓ License is valid\n";
+        if ($validation['data']['cached'] ?? false) {
+            echo "  Using cached token (no server call)\n";
+        }
     }
 }
 ```
@@ -124,15 +146,16 @@ if ($response['status'] === 'success') {
 // bootstrap.php or index.php
 $client = new LicenseClient('https://your-server.com', __DIR__ . '/storage');
 
-$validation = $client->validateLocalToken(
+$response = $client->setupOrValidateLicense(
+    licenseKey: 'your-license-key',
     domain: $_SERVER['HTTP_HOST'],
     ip: $_SERVER['SERVER_ADDR'],
     directory: __DIR__,
     checkInterval: 30
 );
 
-if (!$validation['valid']) {
-    die("License validation failed. Please contact support.");
+if ($response['status'] !== 'success') {
+    die("License validation failed: " . $response['message']);
 }
 ```
 
@@ -147,15 +170,17 @@ public function handle($request, Closure $next)
         storage_path('app')
     );
     
-    $result = $client->validateLocalToken(
+    // Use setupOrValidateLicense - it handles everything automatically
+    $result = $client->setupOrValidateLicense(
+        licenseKey: config('app.license_key'),
         domain: $request->getHost(),
         ip: $request->ip(),
         directory: base_path(),
         checkInterval: 30
     );
     
-    if (!$result['valid']) {
-        abort(403, 'License validation failed');
+    if ($result['status'] !== 'success') {
+        abort(403, 'License validation failed: ' . $result['message']);
     }
     
     return $next($request);

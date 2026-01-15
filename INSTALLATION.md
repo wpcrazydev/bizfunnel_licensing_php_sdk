@@ -24,7 +24,6 @@ This guide covers different installation methods for the Bizfunnel Licensing Cli
    
    $client = new LicenseClient(
        'https://your-license-server.com',
-       'your-api-token',
        __DIR__ . '/storage'
    );
    ```
@@ -45,7 +44,6 @@ This guide covers different installation methods for the Bizfunnel Licensing Cli
    // Or use it directly
    $client = new LicenseClient(
        config('app.license_api_url'),
-       auth()->user()?->api_token,
        storage_path('app')
    );
    ```
@@ -122,8 +120,7 @@ composer require bizfunnel/licensing-client-php-sdk
 // The class will be autoloaded automatically
 $client = new LicenseClient(
     'https://your-license-server.com',
-    'your-api-token',
-    storage_path('app') // For Laravel
+    storage_path('app') // For Laravel (optional, defaults to current directory)
 );
 ```
 
@@ -208,7 +205,6 @@ require_once 'LicenseClient.php';
 try {
     $client = new LicenseClient(
         'https://your-license-server.com',
-        null, // No token needed for public validation
         __DIR__ . '/storage'
     );
     
